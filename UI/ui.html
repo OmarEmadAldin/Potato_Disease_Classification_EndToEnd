@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Potato Disease Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Mono:wght@400;500&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1410;
+    --surface:  #181d19;
+    --surface2: #1f2720;
+    --border:   #2e3b30;
+    --border2:  #3d5040;
+    --text:     #e8ede9;
+    --muted:    #7a9180;
+    --faint:    #3d5040;
+    --green:    #4ade80;
+    --green-dk: #16a34a;
+    --amber:    #fbbf24;
+    --amber-dk: #b45309;
+    --red:      #f87171;
+    --red-dk:   #b91c1c;
+    --blue:     #60a5fa;
+    --radius:   12px;
+    --radius-sm:8px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .page { width: 100%; max-width: 620px; }
+
+  /* ── Header ── */
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 2rem; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, #16a34a 0%, #4ade80 100%);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .logo svg { width: 24px; height: 24px; fill: #0f1410; }
+  .header-text h1 { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; letter-spacing:-.3px; }
+  .header-text p  { font-size:13px; color:var(--muted); margin-top:2px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: .9rem;
+  }
+
+  /* ── Drop zone ── */
+  .drop-zone {
+    border: 1.5px dashed var(--border2); border-radius: var(--radius);
+    padding: 2.5rem 1rem; text-align: center; cursor: pointer;
+    transition: .2s; background: var(--surface2);
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.over { border-color: var(--green); background: #16a34a0d; }
+  .drop-icon { font-size: 34px; display: block; margin-bottom: .6rem; }
+  .drop-main { font-size: 14px; color: var(--text); }
+  .drop-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  #fileInput { display: none; }
+
+  .preview-wrap { position: relative; display: none; }
+  .preview-img {
+    width: 100%; border-radius: var(--radius-sm); max-height: 280px;
+    object-fit: contain; background: var(--surface2);
+    display: block;
+  }
+  .change-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(0,0,0,.65); color: #fff; border: none;
+    border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+    font-family: 'Lato', sans-serif;
+  }
+
+  /* ── Predict button ── */
+  .predict-btn {
+    width: 100%; padding: 14px; margin-top: .5rem;
+    background: var(--green); color: #0f1410;
+    border: none; border-radius: var(--radius-sm);
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: .15s; letter-spacing: .02em;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .predict-btn:hover:not(:disabled) { background: #86efac; }
+  .predict-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .spinner {
+    width: 17px; height: 17px; border: 2px solid #0f141080;
+    border-top-color: #0f1410; border-radius: 50%;
+    animation: spin .65s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ── */
+  .error-box {
+    background: #7f1d1d22; border: 1px solid var(--red-dk);
+    border-radius: var(--radius-sm); padding: .65rem 1rem;
+    font-size: 13px; color: var(--red); margin-top: .75rem; display: none;
+  }
+
+  /* ── Result ── */
+  .result-card {
+    margin-top: 1rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; display: none;
+    animation: fadeUp .3s ease;
+  }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+  .result-hero {
+    padding: 1.25rem 1.5rem;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .result-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .result-name { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; }
+  .result-pct  { font-family:'DM Mono',monospace; font-size:16px; margin-left:auto; }
+
+  .result-body { padding: 0 1.5rem 1.25rem; }
+
+  /* main conf bar */
+  .bar-wrap { margin-bottom: 1.25rem; }
+  .bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .bar-track { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .bar-fill   { height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.4,0,.2,1); width: 0%; }
+
+  /* ranked list */
+  .ranked-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem; }
+  .ranked-row  { display: flex; align-items: center; gap: 10px; }
+  .ranked-name { width: 120px; font-size: 13px; color: var(--muted); }
+  .ranked-track { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .ranked-bar   { height: 100%; border-radius: 3px; background: var(--border2); transition: width .6s ease .1s; }
+  .ranked-pct   { font-family:'DM Mono',monospace; font-size: 11px; color: var(--muted); min-width: 40px; text-align: right; }
+
+  /* all-scores grid */
+  .scores-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1rem; }
+  .score-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px 10px; text-align: center;
+  }
+  .score-chip .sc-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .score-chip .sc-val   { font-family:'DM Mono',monospace; font-size: 15px; font-weight: 500; }
+
+  /* meta chips */
+  .meta-row { display: flex; gap: 6px; flex-wrap: wrap; padding-top: .75rem; border-top: 1px solid var(--border); }
+  .meta-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 10px; font-size: 11px; color: var(--muted);
+  }
+  .meta-chip b { color: var(--text); font-weight: 700; }
+
+  /* ── Health badge ── */
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; margin-left: 8px; vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 24 24"><path d="M12 3C9 3 6.5 5.2 6.5 8c0 2 1.1 3.8 2.8 4.8L8.5 21h7l-.8-8.2C16.4 11.8 17.5 10 17.5 8 17.5 5.2 15 3 12 3z"/></svg>
+    </div>
+    <div class="header-text">
+      <h1>Potato Disease Classifier</h1>
+      <p>Upload a leaf image — get instant AI diagnosis</p>
+    </div>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card">
+    <div class="card-label">Leaf image</div>
+
+    <div class="drop-zone" id="dropZone"
+         onclick="fileInput.click()"
+         ondragover="ev(event,true)" ondragleave="ev(event,false)" ondrop="drop(event)">
+      <span class="drop-icon">🍃</span>
+      <div class="drop-main">Click to upload or drag &amp; drop</div>
+      <div class="drop-hint">JPG · PNG · WEBP — up to 10 MB</div>
+    </div>
+
+    <div class="preview-wrap" id="previewWrap">
+      <img id="previewImg" class="preview-img" alt="preview">
+      <button class="change-btn" onclick="reset()">change image</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" onchange="load(this.files[0])">
+  </div>
+
+  <!-- Predict button -->
+  <button class="predict-btn" id="predictBtn" onclick="run()" disabled>
+    <div class="spinner" id="spinner"></div>
+    <span id="btnLabel">Classify Leaf</span>
+  </button>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Result -->
+  <div class="result-card" id="resultCard">
+    <div class="result-hero" id="resultHero">
+      <div class="result-dot" id="resultDot"></div>
+      <span class="result-name" id="resultName"></span>
+      <span id="resultBadge" class="badge"></span>
+      <span class="result-pct" id="resultPct"></span>
+    </div>
+
+    <div class="result-body">
+      <div class="bar-wrap">
+        <div class="bar-labels"><span>Confidence</span><span id="barPct"></span></div>
+        <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+      </div>
+
+      <div id="rankedSection" style="display:none">
+        <div class="card-label" style="margin-bottom:.6rem">All predictions</div>
+        <div class="ranked-list" id="rankedList"></div>
+      </div>
+
+      <div id="scoresSection" style="display:none">
+        <div class="card-label" style="margin-bottom:.6rem">Probability breakdown</div>
+        <div class="scores-grid" id="scoresGrid"></div>
+      </div>
+
+      <div class="meta-row" id="metaRow"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = "http://127.0.0.1:1234";
+let currentFile = null;
+
+// ── class styling ──────────────────────────────────────────────────────────────
+const STYLES = {
+  "Early_Blight": { hero:"#b4530833", dot:"#fbbf24", pct:"#fbbf24", bar:"#fbbf24", badge:"#b4530833", badgeText:"#fbbf24", label:"⚠ Disease" },
+  "Late_Blight":  { hero:"#7f1d1d33", dot:"#f87171", pct:"#f87171", bar:"#f87171", badge:"#7f1d1d55", badgeText:"#f87171", label:"✕ Severe" },
+  "Healthy":      { hero:"#16a34a22", dot:"#4ade80", pct:"#4ade80", bar:"#4ade80", badge:"#16a34a33", badgeText:"#4ade80", label:"✓ Healthy" },
+};
+const DEFAULT_STYLE = { hero:"#1e3a5f33", dot:"#60a5fa", pct:"#60a5fa", bar:"#60a5fa", badge:"#1e3a5f55", badgeText:"#60a5fa", label:"" };
+
+function styleFor(cls){ return STYLES[cls] || DEFAULT_STYLE; }
+function fmtPct(v){ return Math.round(v*100)+'%'; }
+
+// ── file handling ─────────────────────────────────────────────────────────────
+function ev(e,over){ e.preventDefault(); dropZone.classList.toggle('over',over); }
+function drop(e){ e.preventDefault(); ev(e,false); if(e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); }
+
+function load(f){
+  if(!f) return;
+  currentFile = f;
+  previewImg.src = URL.createObjectURL(f);
+  dropZone.style.display = 'none';
+  previewWrap.style.display = 'block';
+  predictBtn.disabled = false;
+  resultCard.style.display = 'none';
+  errorBox.style.display = 'none';
+}
+
+function reset(){
+  currentFile = null;
+  fileInput.value = '';
+  dropZone.style.display = 'block';
+  previewWrap.style.display = 'none';
+  predictBtn.disabled = true;
+  resultCard.style.display = 'none';
+  errorBox.style.display = 'none';
+}
+
+// ── predict ───────────────────────────────────────────────────────────────────
+async function run(){
+  if(!currentFile) return;
+  predictBtn.disabled = true;
+  spinner.style.display = 'block';
+  btnLabel.textContent = 'Analysing…';
+  errorBox.style.display = 'none';
+  resultCard.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('file', currentFile);
+
+  let data;
+  try{
+    const res = await fetch(`${API}/predict`, { method:'POST', body:fd });
+    if(!res.ok){ const e=await res.json(); throw new Error(e.detail||'Server error '+res.status); }
+    data = await res.json();
+  } catch(err){
+    showError(err.message);
+    return;
+  } finally {
+    predictBtn.disabled = false;
+    spinner.style.display = 'none';
+    btnLabel.textContent = 'Classify Leaf';
+  }
+
+  render(data);
+}
+
+function showError(msg){
+  errorBox.textContent = msg;
+  errorBox.style.display = 'block';
+}
+
+// ── render result ─────────────────────────────────────────────────────────────
+function render(data){
+  const s = styleFor(data.class);
+  const conf = data.confidence;
+
+  resultHero.style.background = s.hero;
+  resultDot.style.background  = s.dot;
+  resultName.textContent       = data.class.replace('_',' ');
+  resultName.style.color       = s.pct;
+  resultPct.textContent        = fmtPct(conf);
+  resultPct.style.color        = s.pct;
+  barPct.textContent           = fmtPct(conf);
+  barFill.style.background     = s.bar;
+  setTimeout(()=>{ barFill.style.width = fmtPct(conf); }, 50);
+
+  resultBadge.textContent          = s.label;
+  resultBadge.style.background     = s.badge;
+  resultBadge.style.color          = s.badgeText;
+
+  // ranked list (top > 1)
+  const top = data.top || [{class:data.class, confidence:conf}];
+  if(top.length > 1){
+    rankedSection.style.display = 'block';
+    rankedList.innerHTML = top.map(item=>{
+      const is = styleFor(item.class);
+      return `<div class="ranked-row">
+        <span class="ranked-name">${item.class.replace('_',' ')}</span>
+        <div class="ranked-track"><div class="ranked-bar" style="width:${fmtPct(item.confidence)};background:${is.bar}"></div></div>
+        <span class="ranked-pct">${fmtPct(item.confidence)}</span>
+      </div>`;
+    }).join('');
+  } else {
+    rankedSection.style.display = 'none';
+  }
+
+  // all-scores grid (always shown when available)
+  if(data.all_scores){
+    scoresSection.style.display = 'block';
+    scoresGrid.innerHTML = Object.entries(data.all_scores).map(([cls,prob])=>{
+      const cs = styleFor(cls);
+      return `<div class="score-chip">
+        <div class="sc-label">${cls.replace('_',' ')}</div>
+        <div class="sc-val" style="color:${cs.pct}">${fmtPct(prob)}</div>
+      </div>`;
+    }).join('');
+  } else {
+    scoresSection.style.display = 'none';
+  }
+
+  // meta
+  const fname = currentFile.name.length>20 ? currentFile.name.slice(0,18)+'…' : currentFile.name;
+  metaRow.innerHTML = `
+    <span class="meta-chip">Model: <b>${data.model||'potato_disease_model'}</b></span>
+    <span class="meta-chip">Input: <b>${data.image_size||256}×${data.image_size||256}</b></span>
+    <span class="meta-chip">File: <b>${fname}</b></span>
+    <span class="meta-chip">Classes: <b>${(data.all_scores?Object.keys(data.all_scores):['Early_Blight','Late_Blight','Healthy']).length}</b></span>
+  `;
+
+  resultCard.style.display = 'block';
+}
+</script>
+</body>
+</html>
