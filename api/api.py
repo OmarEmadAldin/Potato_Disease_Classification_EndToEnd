@@ -3,6 +3,7 @@ import uvicorn
 import numpy as np
 import cv2
 import tensorflow as tf
+from fastapi.responses import FileResponse
 
 MODEL_PATH = "./model/potato_disease_model.keras"
 CLASS_NAMES = ['Early_blight', 'Late_blight', 'Healthy']
@@ -15,12 +16,8 @@ app = FastAPI(
 )
 
 @app.get("/")
-def health():
-    return {"status": "API running"}
-
-@app.get("/ping")
-def ping():
-    return {"message": "API alive"}
+def serve_ui():
+    return FileResponse("./UI/ui.html", media_type="text/html")
 
 
 def read_file_as_image(data: bytes) -> np.ndarray:
@@ -38,15 +35,10 @@ async def predict(file: UploadFile = File(...)):
 
     try:
         image = read_file_as_image(await file.read())
-
         image_batch = np.expand_dims(image, axis=0)
-
         predictions = model.predict(image_batch)
-
         predicted_index = int(np.argmax(predictions[0]))
-
         predicted_class = CLASS_NAMES[predicted_index]
-
         confidence = float(np.max(predictions[0]))
 
         return {
